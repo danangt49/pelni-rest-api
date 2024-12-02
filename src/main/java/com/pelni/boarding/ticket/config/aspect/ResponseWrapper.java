@@ -1,0 +1,64 @@
+package com.pelni.boarding.ticket.config.aspect;
+
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponseWrapper;
+
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+
+public class ResponseWrapper extends HttpServletResponseWrapper {
+
+    private ServletOutputStream outputStream;
+    private PrintWriter writer;
+    private CustomOutputStream copier;
+    private byte[] copy;
+
+    public ResponseWrapper(HttpServletResponse response) {
+        super(response);
+    }
+
+    @Override
+    public ServletOutputStream getOutputStream() throws IOException {
+        if (writer != null) {
+            throw new IllegalStateException("getWriter() has already been called on this response.");
+        }
+
+        if (outputStream == null) {
+            outputStream = getResponse().getOutputStream();
+            copier = new CustomOutputStream();
+        }
+
+        return copier;
+    }
+
+    @Override
+    public PrintWriter getWriter() throws IOException {
+        if (outputStream != null) {
+            throw new IllegalStateException("getOutputStream() has already been called on this response.");
+        }
+
+        if (writer == null) {
+            copier = new CustomOutputStream();
+            writer = new PrintWriter(new OutputStreamWriter(copier, getResponse().getCharacterEncoding()), true);
+        }
+
+        return writer;
+    }
+
+    @Override
+    public void flushBuffer() throws IOException {
+        if (writer != null) {
+            writer.flush();
+        } else if (outputStream != null) {
+            copier.flush();
+        }
+        copy = copier.getCopy();
+    }
+
+    public byte[] getCopy() {
+        return copy;
+    }
+
+}

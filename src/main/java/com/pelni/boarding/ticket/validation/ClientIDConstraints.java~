@@ -1,0 +1,17 @@
+package com.tsmid.auth.validation;
+
+import com.tsmid.auth.validation.impl.ClientIdValidatorImpl;
+import jakarta.validation.Constraint;
+import jakarta.validation.Payload;
+
+import java.lang.annotation.*;
+
+@Documented
+@Target({ElementType.FIELD})
+@Retention(RetentionPolicy.RUNTIME)
+@Constraint(validatedBy = ClientIdValidatorImpl.class)
+public @interface ClientIDConstraints {
+    String message() default "Client ID Already exist";
+    Class<?>[] groups() default {};
+    Class<? extends Payload>[] payload() default {};
+}

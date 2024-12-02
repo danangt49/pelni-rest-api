@@ -1,0 +1,13 @@
+checkinInfoDb.setBookingCode(bookingCode);
+                        checkinInfoDb.setNumberCode(jsonNode.path("NUM_CODE").asText());
+        checkinInfoDb.setShipNo(jsonNode.path("SHIP_NO").asText());
+        checkinInfoDb.setShipName(jsonNode.path("SHIP_NAME").asText());
+        checkinInfoDb.setAge(jsonNode.path("VOYAGE_NO").asText());
+        checkinInfoDb.setYear(jsonNode.path("YEAR").asText());
+        checkinInfoDb.setOrganizationCode(jsonNode.path("ORG").asText());
+        checkinInfoDb.setOrganizationName(jsonNode.path("ORG_NAME").asText());
+        checkinInfoDb.setOrganizationCall(jsonNode.path("ORG_CALL").asText());
+        checkinInfoDb.setDestinationCode(jsonNode.path("DES").asText());
+        checkinInfoDb.setDestinationName(jsonNode.path("DES_NAME").asText());
+        checkinInfoDb.setDestinationCall(jsonNode.path("DES_CALL").asText());
+

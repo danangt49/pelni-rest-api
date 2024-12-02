@@ -1,0 +1,13 @@
+package com.tsmid.auth.dto;
+
+import lombok.Data;
+
+@Data
+public class CustomerDto {
+    private String name;
+    private String username;
+    private String email;
+    private String merchantCode;
+    private String appCode;
+    private String clientKey;
+}

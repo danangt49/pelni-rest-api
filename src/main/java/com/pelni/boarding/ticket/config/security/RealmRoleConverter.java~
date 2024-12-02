@@ -1,0 +1,26 @@
+package com.tsmid.auth.config.security;
+
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.oauth2.jwt.Jwt;
+
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import static com.tsmid.auth.util.MyConstants.REALM_ACCESS;
+import static com.tsmid.auth.util.MyConstants.ROLES;
+
+@SuppressWarnings("ALL")
+public class RealmRoleConverter implements Converter<Jwt, Collection<GrantedAuthority>> {
+    @Override
+    public Collection<GrantedAuthority> convert(Jwt jwt) {
+        final Map<String, List<String>> realmAccess = (Map<String, List<String>>) jwt.getClaims().get(REALM_ACCESS);
+        return realmAccess.get(ROLES)
+                .stream()
+                .map(SimpleGrantedAuthority::new)
+                .collect(Collectors.toList());
+    }
+}

@@ -1,0 +1,65 @@
+package com.tsmid.auth.config.security;
+
+import com.tsmid.auth.config.GlobalApiResponse;
+import com.tsmid.auth.entity.enumeric.Roles;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.convert.converter.Converter;
+import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.web.SecurityFilterChain;
+
+import java.io.IOException;
+
+import static org.springframework.http.HttpStatus.FORBIDDEN;
+import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
+
+@SuppressWarnings("ALL")
+@Configuration
+@EnableWebSecurity
+public class ResourceServerConfig {
+
+    private Converter<Jwt, ? extends AbstractAuthenticationToken> jwtAuthenticationConverter() {
+        JwtAuthenticationConverter jwtConverter = new JwtAuthenticationConverter();
+        jwtConverter.setJwtGrantedAuthoritiesConverter(new RealmRoleConverter());
+        return jwtConverter;
+    }
+
+    @Bean
+    public SecurityFilterChain apiFilterChain(HttpSecurity http) throws Exception {
+        http.csrf(AbstractHttpConfigurer::disable)
+                .authorizeRequests(authorizeRequests ->
+                        authorizeRequests
+                                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/api/test/**").permitAll()
+                                .requestMatchers("/api/v1/auth/**").permitAll()
+                                .requestMatchers("/api/v1/user/**").hasAuthority(Roles.ROLE_USER.name())
+                                .requestMatchers("/api/v1/dashboard/**").hasAuthority(Roles.ROLE_ADMIN.name())
+                                .anyRequest().authenticated()
+                )
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
+                .exceptionHandling(exceptionHandling -> exceptionHandling
+                        .accessDeniedHandler((request, response, e) -> {
+                            response.setStatus(FORBIDDEN.value());
+                            response.setContentType(APPLICATION_JSON_VALUE);
+                            try {
+                                response.getWriter().write(new GlobalApiResponse<>(e.getMessage(), FORBIDDEN).toJson());
+                            } catch (IOException ioException) {
+                                ioException.printStackTrace();
+                            }
+                        })
+                        .authenticationEntryPoint((request, response, e) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.getWriter().println("HTTP Status 401 - " + e.getMessage());
+                        })
+                )
+                .sessionManagement(sessionManagement -> sessionManagement.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+
+        return http.build();
+    }
+}

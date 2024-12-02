@@ -1,0 +1,28 @@
+package com.tsmid.auth.vo;
+
+import com.tsmid.auth.validation.CheckUrlConstraints;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.io.Serializable;
+
+/**
+ * DTO for {@link com.tsmid.auth.entity.WhitelistUrl}
+ */
+@AllArgsConstructor
+@NoArgsConstructor
+@Getter
+@Setter
+public class WhitelistUrlVo implements Serializable {
+    @NotBlank
+    @CheckUrlConstraints
+    private String url;
+    @NotNull
+    private Boolean requestBearerAccessToken;
+    @NotNull
+    private Boolean requestSignature;
+}

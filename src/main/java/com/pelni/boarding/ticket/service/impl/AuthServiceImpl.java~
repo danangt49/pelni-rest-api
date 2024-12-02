@@ -1,0 +1,408 @@
+package com.tsmid.auth.service.impl;
+
+import com.nimbusds.jose.shaded.gson.Gson;
+import com.tsmid.auth.config.exception.CustomException;
+import com.tsmid.auth.dto.GetTokenDto;
+import com.tsmid.auth.dto.OTPTokenDto;
+import com.tsmid.auth.service.AuthService;
+import com.tsmid.auth.util.UtilFn;
+import com.tsmid.auth.vo.*;
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
+import jakarta.ws.rs.core.Response;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jboss.resteasy.client.jaxrs.internal.ResteasyClientBuilderImpl;
+import org.json.JSONObject;
+import org.keycloak.OAuth2Constants;
+import org.keycloak.admin.client.CreatedResponseUtil;
+import org.keycloak.admin.client.Keycloak;
+import org.keycloak.admin.client.KeycloakBuilder;
+import org.keycloak.admin.client.resource.RealmResource;
+import org.keycloak.admin.client.resource.UserResource;
+import org.keycloak.admin.client.resource.UsersResource;
+import org.keycloak.representations.AccessTokenResponse;
+import org.keycloak.representations.idm.CredentialRepresentation;
+import org.keycloak.representations.idm.RoleRepresentation;
+import org.keycloak.representations.idm.UserRepresentation;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.RestTemplate;
+import org.thymeleaf.context.Context;
+import org.thymeleaf.spring6.SpringTemplateEngine;
+
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+
+import static com.tsmid.auth.config.keycloak.Credentials.createPasswordCredentials;
+import static com.tsmid.auth.util.Generate.*;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class AuthServiceImpl implements AuthService {
+    private final Keycloak keycloakAdminClient;
+    private final JavaMailSender javaMailSender;
+    private final SpringTemplateEngine templateEngine;
+
+    @Value("${keycloak.url}")
+    private String baseUrl;
+
+    @Value("${keycloak.realm}")
+    private String realm;
+
+    @Value("${keycloak.client.id}")
+    private String clientId;
+
+    @Value("${keycloak.client.secret}")
+    private String clientSecret;
+
+    @Value("${keycloak.path.realm}")
+    private String pathRealm;
+
+    @Value("${keycloak.path.logout}")
+    private String pathLogout;
+
+    @Value("${keycloak.path.refresh-token}")
+    private String pathRefresh;
+
+    @Value("${spring.mail.expired}")
+    private Long expiredTime;
+
+    @Value("${spring.mail.from}")
+    private String from;
+
+    @Override
+    public String register(RegisterVo vo) {
+        log.info("Registering user : {}", vo);
+        log.info("Checking if email already exists");
+        var checkEmail = getUsersResource().searchByEmail(vo.getEmail(), true);
+        if (!checkEmail.isEmpty()) {
+            log.error("Email already exists");
+            throw new CustomException("Email already exists", HttpStatus.CONFLICT);
+        }
+
+        log.info("Checking if username already exists");
+        var checkUsername = getUsersResource().searchByUsername(vo.getUsername(), true);
+        if (!checkUsername.isEmpty()) {
+            log.error("Username already exists");
+            throw new CustomException("Username already exists", HttpStatus.CONFLICT);
+        }
+
+        RoleRepresentation role;
+        try {
+            role =  keycloakAdminClient.realm(realm).roles().get(vo.getRole().name()).toRepresentation();
+        } catch (Exception e) {
+            log.error("Role Not Found ", e);
+            throw new CustomException("Role Not Found ", HttpStatus.NOT_FOUND);
+        }
+
+        UserRepresentation userRepresentation = new UserRepresentation();
+        userRepresentation.setFirstName(vo.getName());
+        userRepresentation.setUsername(vo.getUsername());
+        userRepresentation.setEmailVerified(true);
+        userRepresentation.setEmail(vo.getEmail());
+        userRepresentation.setEnabled(true);
+
+        UtilFn.setAttribute(userRepresentation, vo.getMerchantCode(), vo.getAppCode(), vo.getClientKey());
+        CredentialRepresentation credentialRepresentation = createPasswordCredentials(vo.getPassword());
+        userRepresentation.setCredentials(Collections.singletonList(credentialRepresentation));
+
+        log.info("Creating user: {}", new Gson().toJson(userRepresentation));
+        try (Response response = getUsersResource().create(userRepresentation)) {
+            if (response.getStatus() == Response.Status.CREATED.getStatusCode()) {
+                String userId = CreatedResponseUtil.getCreatedId(response);
+                var userResource = getUsersResource().get(userId);
+                userResource.roles().realmLevel().add(Collections.singletonList(role));
+
+                log.info("User created successfully");
+                return "User created successfully";
+            } else {
+              log.error("Failed to create user with name: {}", userRepresentation.getUsername());
+              throw new CustomException("Failed to create user", HttpStatus.valueOf(response.getStatus()));
+            }
+        } catch (Exception e) {
+            log.error("Error creating user", e);
+            throw new CustomException("Failed to create user due to an error: "
+              + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    public GetTokenDto login(LoginVo vo) {
+        log.info("Attempting login for user: {}", vo.getUsernameOrEmail());
+
+        Keycloak keycloak = KeycloakBuilder.builder()
+            .serverUrl(baseUrl)
+            .realm(realm)
+            .grantType(OAuth2Constants.PASSWORD)
+            .username(vo.getUsernameOrEmail())
+            .password(vo.getPassword())
+            .clientId(clientId)
+            .clientSecret(clientSecret)
+            .resteasyClient(new ResteasyClientBuilderImpl().connectionPoolSize(10).build())
+            .build();
+
+        try {
+            AccessTokenResponse tokenResponse = keycloak.tokenManager().getAccessToken();
+            log.info("Successfully obtained access token for user: {}", vo.getUsernameOrEmail());
+            return getTokenDto(tokenResponse);
+        } catch (Exception e) {
+            log.error("Error during login for user {}: {}", vo.getUsernameOrEmail(), e.getMessage());
+            throw new CustomException("Invalid username or password", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @Override
+    public String logout() {
+        String url = baseUrl + pathRealm + realm + pathLogout;
+        log.info("Preparing logout request to URL: {}", url);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+        MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+        formData.add("access_token", UtilFn.getToken());
+        formData.add("client_id", clientId);
+        formData.add("client_secret", clientSecret);
+        log.info("form data : {}", formData);
+
+        HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(formData, headers);
+
+        RestTemplate restTemplate = new RestTemplate();
+        ResponseEntity<?> response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+        log.info("Response logout with code  : {}", response.getStatusCode());
+
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            log.error("Failed to logout. Response status: {}", response.getStatusCode());
+            throw new CustomException("Failed to logout", (HttpStatus) response.getStatusCode());
+        } else {
+            log.info("Successfully logged out. Response status: {}", response.getStatusCode());
+            return "Successfully logged out";
+        }
+    }
+
+    @Override
+    public GetTokenDto refreshToken(String refreshToken) {
+        String url = baseUrl + pathRealm + realm + pathRefresh;
+        log.info("Preparing refresh token request to URL: {}", url);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+        MultiValueMap<String, String> map = new LinkedMultiValueMap<>();
+        map.add("grant_type", OAuth2Constants.REFRESH_TOKEN);
+        map.add("refresh_token", refreshToken);
+        map.add("client_id", clientId);
+        map.add("client_secret", clientSecret);
+        log.info("refresh token data : {}", map);
+
+        HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(map, headers);
+        RestTemplate restTemplate = new RestTemplate();
+        var response = restTemplate.exchange(url,
+                        HttpMethod.POST,
+                        entity,
+                        AccessTokenResponse.class);
+        log.info("Response refresh token with code : {}", response.getStatusCode());
+        return getTokenDto(Objects.requireNonNull(response.getBody()));
+    }
+
+    @Override
+    public String forgotPassword(ForgotPasswordVo vo) {
+        log.info("Starting Forgot Password for email: {}", vo.getEmail());
+        UsersResource usersResource = getUsersResource();
+        List<UserRepresentation> users = usersResource.searchByEmail(vo.getEmail(), true);
+
+        if (users.isEmpty()) {
+            log.error("User not found for email: {}", vo.getEmail());
+            throw new CustomException("User not found", HttpStatus.NOT_FOUND);
+        }
+
+        long expired = System.currentTimeMillis() + (expiredTime * 60 * 1000);
+        log.info("OTP will expire in {} minutes (timestamp: {})", expiredTime, expired);
+
+        UserRepresentation user = users.getFirst();
+        String otp = generateOtp(6);
+        log.info("Generated OTP: {} for user: {}", otp, user.getUsername());
+
+        var attributes = user.getAttributes();
+        attributes.put("otp", Collections.singletonList(otp));
+        attributes.put("expired_otp", Collections.singletonList(String.valueOf(expired)));
+        attributes.put("verify_otp", Collections.singletonList("false"));
+        user.setAttributes(attributes);
+        log.info("Updated user attributes with OTP and expiration time for user: {}", user.getUsername());
+
+        sendOtpEmail(user.getEmail(), otp, expiredTime);
+        log.info("Sent OTP email to: {}", user.getEmail());
+
+        usersResource.get(user.getId()).update(user);
+        log.info("Updated user resource for user ID: {}", user.getId());
+
+        log.info("Completed forgotPassword method for email: {}", vo.getEmail());
+        return "Success Sending OTP email";
+    }
+
+    @Override
+    public OTPTokenDto verifyOTP(VerifyOTPVo vo) {
+        log.info("Verifying OTP for email: {}", vo.getEmail());
+        UsersResource usersResource = getUsersResource();
+        List<UserRepresentation> users = usersResource.searchByEmail(vo.getEmail(), true);
+
+        if (users.isEmpty()) {
+            log.error("User not found in verifying OTP with email: {}", vo.getEmail());
+            throw new CustomException("User not found", HttpStatus.NOT_FOUND);
+        }
+
+        UserRepresentation userRepresentation = users.getFirst();
+
+        log.info("Verifying OTP for user: {}", userRepresentation.getUsername());
+        if (userRepresentation.getAttributes() != null &&
+                userRepresentation.getAttributes().get("otp") != null &&
+                userRepresentation.getAttributes().get("expired_otp") != null) {
+
+            String storedOtp = userRepresentation.getAttributes().get("otp").getFirst();
+            log.info("storedOtp: {}", storedOtp);
+
+            String expiredOtpTimestamp = userRepresentation.getAttributes().get("expired_otp").getFirst();
+            log.info("expiredOtpTimestamp: {}", expiredOtpTimestamp);
+
+            long currentTime = System.currentTimeMillis();
+            log.info("currentTime: {}", currentTime);
+
+            if (storedOtp.equals(vo.getOtp()) && Long.parseLong(expiredOtpTimestamp) > currentTime) {
+                userRepresentation.getAttributes().put("verify_otp", Collections.singletonList("true"));
+                usersResource.get(userRepresentation.getId()).update(userRepresentation);
+
+                log.info("Encrypt data for user: {}", userRepresentation.getUsername());
+                var enc = encryptUUID(userRepresentation.getId(), clientSecret);
+                OTPTokenDto otpTokenDto = new OTPTokenDto();
+                otpTokenDto.setToken(enc);
+
+                log.info("OTP verified successfully");
+                return otpTokenDto;
+            } else {
+                log.error("Invalid OTP or OTP has expired");
+                throw new CustomException("Invalid OTP or OTP has expired", HttpStatus.BAD_REQUEST);
+            }
+        } else {
+            log.error("OTP or expiration time is missing in user attributes");
+            throw new CustomException("OTP or expiration time is missing", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    @Override
+    public String resetPassword(ResetPasswordVo vo) {
+        log.info("Checking new Password and confirmation password");
+        if (!vo.getPassword().equals(vo.getConfirmationPassword())) {
+            throw new CustomException("Password does not match", HttpStatus.BAD_REQUEST);
+        }
+        var decrypted = decryptUUID(vo.getToken(), clientSecret);
+        if (decrypted == null) {
+            throw new CustomException("Invalid token", HttpStatus.BAD_REQUEST);
+        }
+        log.info("Get User ID to reset password: {}", decrypted);
+        UserResource userResource = getUsersResource().get(decrypted);
+        if (userResource == null) {
+            throw new CustomException("User not found", HttpStatus.NOT_FOUND);
+        }
+
+        log.info("Check user in keycloak to reset password");
+        UserRepresentation userRepresentation = userResource.toRepresentation();
+
+        if (userRepresentation.getAttributes().get("verify_otp") == null ||
+                !userRepresentation.getAttributes().get("verify_otp").contains("true")) {
+            throw new CustomException("Session Expired", HttpStatus.BAD_REQUEST);
+        }
+
+        CredentialRepresentation credentialRepresentation = new CredentialRepresentation();
+        credentialRepresentation.setTemporary(false);
+        credentialRepresentation.setType(CredentialRepresentation.PASSWORD);
+        credentialRepresentation.setValue(vo.getPassword());
+
+        userRepresentation.setCredentials(Collections.singletonList(credentialRepresentation));
+        userResource.update(userRepresentation);
+        log.info("Password update actions executed");
+
+        userRepresentation.getAttributes().remove("otp");
+        userRepresentation.getAttributes().remove("expired_otp");
+        userRepresentation.getAttributes().remove("verify_otp");
+        userResource.update(userRepresentation);
+        log.info("Attributes otp, expired_otp, verify_otp removed");
+
+        return "Successfully updated password";
+    }
+
+    private UsersResource getUsersResource() {
+        RealmResource realmResource = keycloakAdminClient.realm(realm);
+        return realmResource.users();
+    }
+
+    private GetTokenDto getTokenDto(AccessTokenResponse accessTokenResponse) {
+        String token = accessTokenResponse.getToken();
+        String[] tokenParts = token.split("\\.");
+        String encodedPayload = tokenParts[1];
+
+        byte[] decodedPayload = Base64.getDecoder().decode(encodedPayload);
+        String payload = new String(decodedPayload);
+
+        JSONObject payloadJson = new JSONObject(payload);
+
+        GetTokenDto response = new GetTokenDto();
+        response.setAccessToken(accessTokenResponse.getToken());
+        response.setRefreshToken(accessTokenResponse.getRefreshToken());
+        response.setExpiresIn(accessTokenResponse.getExpiresIn());
+        response.setRefreshExpiresIn(accessTokenResponse.getRefreshExpiresIn());
+        response.setTokenType(accessTokenResponse.getTokenType());
+        response.setEmail(payloadJson.getString("email"));
+        response.setEmailVerified(payloadJson.getBoolean("email_verified"));
+        response.setMerchantCode(payloadJson.getString("merchant_code"));
+        response.setAppCode(payloadJson.getString("app_code"));
+        response.setClientKey(payloadJson.getString("client_key"));
+
+        return response;
+    }
+
+    @Async
+    public void sendOtpEmail(String email, String otp, long expirationTime) {
+        try {
+            log.info("Sending OTP");
+            EmailVo mail = new EmailVo();
+            mail.setFrom(from);
+            mail.setTo(email);
+            mail.setSubject("One-Time Password");
+
+            Map<String, Object> mailModel = new HashMap<>();
+            mailModel.put("otp", otp);
+            mailModel.put("expired_otp", expirationTime);
+            mail.setModel(mailModel);
+
+            log.info("Email details - From: {}, To: {}, Subject: {}, OTP: {}, Expiration Time: {}",
+                    mail.getFrom(), mail.getTo(), mail.getSubject(), otp, expirationTime);
+
+            MimeMessage message = javaMailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message,
+                    MimeMessageHelper.MULTIPART_MODE_MIXED_RELATED,
+                    StandardCharsets.UTF_8.name());
+            Context context = new Context();
+            context.setVariables(mail.getModel());
+            String html = templateEngine.process("email-template-otp", context);
+            helper.setTo(mail.getTo());
+            helper.setFrom(mail.getFrom());
+            helper.setSubject(mail.getSubject());
+            helper.setText(html, true);
+            log.info("Sending Otp");
+
+            javaMailSender.send(message);
+            log.info("Finish Send Otp");
+        } catch (MessagingException e) {
+            log.error("Failed to send OTP email: {}", e.getMessage());
+            throw new CustomException("Internal Server Error", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+}

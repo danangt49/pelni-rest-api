@@ -1,0 +1,12 @@
+package com.tsmid.auth.service;
+
+import com.tsmid.auth.dto.CustomerDto;
+import com.tsmid.auth.vo.UpdatePasswordVo;
+import com.tsmid.auth.vo.UpdateProfileVo;
+
+public interface UserService {
+    CustomerDto getProfile();
+    String updatePassword(UpdatePasswordVo vo);
+    String deleteAccount();
+    String updateProfile(UpdateProfileVo vo);
+}

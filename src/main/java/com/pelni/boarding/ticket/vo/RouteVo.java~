@@ -1,0 +1,37 @@
+package com.tsmid.auth.vo;
+
+import com.tsmid.auth.validation.RouteNameConstraints;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.io.Serializable;
+
+@AllArgsConstructor
+@NoArgsConstructor
+@Getter
+@Setter
+public class RouteVo implements Serializable {
+    @NotBlank
+    @RouteNameConstraints
+    private String name;
+    @NotBlank
+    private String whitelist;
+    @NotNull
+    private Boolean isEnable;
+    @NotBlank
+    private String path;
+    @NotBlank
+    private String requestPath;
+    @NotBlank
+    private String destinationPath;
+    private String method;
+    @NotBlank
+    private String uri;
+    private String svc;
+    private String filterClass;
+    private String note;
+}

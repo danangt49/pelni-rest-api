@@ -1,0 +1,31 @@
+package com.tsmid.auth.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import lombok.experimental.FieldNameConstants;
+import lombok.experimental.SuperBuilder;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+@Getter
+@Setter
+@Entity
+@Table(schema = "public", name = "ip_address")
+@NoArgsConstructor
+@AllArgsConstructor
+@SuperBuilder(toBuilder = true)
+@EntityListeners(AuditingEntityListener.class)
+@FieldNameConstants
+@ToString
+public class IpAddress {
+      @Id
+      @GeneratedValue(strategy = GenerationType.IDENTITY)
+      @Column(name = "id", nullable = false)
+      private Long id;
+
+      private String ip;
+
+      private Boolean whitelist;
+
+      @Column(name = "x_client_id")
+      private String xClientId;
+}

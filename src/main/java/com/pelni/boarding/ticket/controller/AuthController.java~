@@ -1,0 +1,68 @@
+package com.tsmid.auth.controller;
+
+
+import com.tsmid.auth.config.GlobalApiResponse;
+import com.tsmid.auth.service.AuthService;
+import com.tsmid.auth.vo.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+@Validated
+@RestController
+@RequiredArgsConstructor
+@RequestMapping(path = "api/v1/auth", produces = MediaType.APPLICATION_JSON_VALUE)
+@Tag(name = "Auth", description = "Management Auth")
+@CrossOrigin(origins = "*", maxAge = 3600)
+public class AuthController {
+
+    private final AuthService authService;
+
+    @Operation(summary = "Register")
+    @PostMapping("register")
+    public ResponseEntity<?> register( @RequestBody @Valid RegisterVo vo) {
+        return new GlobalApiResponse<>(authService.register(vo), HttpStatus.CREATED);
+    }
+
+    @Operation(summary = "Login")
+    @PostMapping("login")
+    public ResponseEntity<?> login(@RequestBody @Valid LoginVo vo) {
+      return new GlobalApiResponse<>(authService.login(vo), HttpStatus.OK);
+    }
+
+    @Operation(summary = "Logout")
+    @PostMapping("logout")
+    public ResponseEntity<?> logout() {
+        return new GlobalApiResponse<>(authService.logout(), HttpStatus.OK);
+    }
+
+    @Operation(summary = "Refresh Token")
+    @GetMapping("refresh-token")
+    public ResponseEntity<?> refreshToken(@RequestParam(value = "refresh-token", required = false) String refreshToken) {
+        return new GlobalApiResponse<>(authService.refreshToken(refreshToken), HttpStatus.OK);
+    }
+
+    @Operation(summary = "Forgot password")
+    @PostMapping("forgot-password")
+    public ResponseEntity<?> requestForgotPassword(@RequestBody @Valid ForgotPasswordVo vo) {
+        return new GlobalApiResponse<>(authService.forgotPassword(vo), HttpStatus.OK);
+    }
+
+    @Operation(summary = "Verify OTP")
+    @PostMapping("verify-otp")
+    public ResponseEntity<?> requestValidateOtp(@RequestBody @Valid VerifyOTPVo vo) {
+        return new GlobalApiResponse<>(authService.verifyOTP(vo), HttpStatus.OK);
+    }
+
+    @Operation(summary = "Set new Password")
+    @PostMapping("reset-password")
+    public ResponseEntity<?> forgotPasswordValidation(@RequestBody @Valid ResetPasswordVo vo) {
+        return new GlobalApiResponse<>(authService.resetPassword(vo), HttpStatus.OK);
+    }
+}

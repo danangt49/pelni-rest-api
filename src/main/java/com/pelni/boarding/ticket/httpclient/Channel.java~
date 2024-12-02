@@ -1,0 +1,58 @@
+package com.tsmid.auth.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import lombok.experimental.FieldNameConstants;
+import lombok.experimental.SuperBuilder;
+import lombok.extern.slf4j.Slf4j;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
+import org.hibernate.annotations.UuidGenerator;
+import org.hibernate.type.SqlTypes;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import java.io.Serial;
+import java.util.List;
+
+@Getter
+@Setter
+@Entity
+@Table(schema = "public", name = "channel")
+@SQLDelete(sql = "update public.channel set deleted=true where id=?")
+@SQLRestriction("deleted=false")
+@NoArgsConstructor
+@AllArgsConstructor
+@SuperBuilder(toBuilder = true)
+@EntityListeners(AuditingEntityListener.class)
+@FieldNameConstants
+@Slf4j
+@ToString
+public class Channel extends BaseEntity {
+
+    @Serial
+    private static final long serialVersionUID = 1L;
+
+    @Column(name = "id", nullable = false)
+    @Id
+    @UuidGenerator(style = UuidGenerator.Style.TIME)
+    @GeneratedValue
+    private String id;
+
+    @Column(name = "acquirer_code")
+    private String acquirerCode;
+
+    private String svc;
+
+    @Column(name = "params", columnDefinition = "jsonb")
+    private String params;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "channel_client", schema = "public",
+            joinColumns = @JoinColumn(name = "channel_id"),
+            inverseJoinColumns = @JoinColumn(name = "client_id"))
+    @ToString.Exclude
+    private List<Client> clients;
+
+}

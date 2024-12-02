@@ -1,0 +1,45 @@
+package com.tsmid.auth.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import lombok.experimental.FieldNameConstants;
+import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+@Getter
+@Setter
+@Entity
+@ToString
+@NoArgsConstructor
+@AllArgsConstructor
+@FieldNameConstants
+@SuperBuilder(toBuilder = true)
+@Table(schema = "public", name = "channel_partner")
+@EntityListeners(AuditingEntityListener.class)
+
+public class ChannelPartner {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id", nullable = false)
+    private Long id;
+
+    @Column(name = "x_client_key", nullable = false, length = 100, unique = true)
+    private String xClientKey;
+
+    @Column(name = "x_client_id", length = 100)
+    private String xClientId;
+
+    @Column(name = "x_secret_key", length = 150)
+    private String xSecretKey;
+
+    @Column(name = "params", nullable = false)
+    private String params;
+
+    @Column(name = "svc", length = 50)
+    private String svc;
+
+    @Column(name = "is_enabled", nullable = false)
+    private Boolean isEnabled;
+}

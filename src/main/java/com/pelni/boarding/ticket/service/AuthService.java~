@@ -1,0 +1,16 @@
+package com.tsmid.auth.service;
+
+
+import com.tsmid.auth.dto.GetTokenDto;
+import com.tsmid.auth.dto.OTPTokenDto;
+import com.tsmid.auth.vo.*;
+
+public interface AuthService {
+    String register(RegisterVo vo);
+    GetTokenDto login(LoginVo vo);
+    String logout();
+    GetTokenDto refreshToken(String refreshToken);
+    String forgotPassword(ForgotPasswordVo vo);
+    OTPTokenDto verifyOTP(VerifyOTPVo vo);
+    String resetPassword(ResetPasswordVo vo);
+}

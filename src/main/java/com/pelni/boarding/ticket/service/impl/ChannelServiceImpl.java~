@@ -1,0 +1,81 @@
+package com.tsmid.auth.service.impl;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.tsmid.auth.config.exception.CustomException;
+import com.tsmid.auth.entity.Channel;
+import com.tsmid.auth.entity.Client;
+import com.tsmid.auth.repository.ChannelRepository;
+import com.tsmid.auth.repository.ClientRepository;
+import com.tsmid.auth.service.ChannelService;
+import com.tsmid.auth.vo.ChannelQueryVo;
+import com.tsmid.auth.vo.ChannelVo;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+import static com.tsmid.auth.util.MyConstants.*;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class ChannelServiceImpl implements ChannelService {
+    private final ChannelRepository channelRepository;
+    private final ClientRepository clientRepository;
+    @Override
+    public String create(ChannelVo vo) {
+        log.info("create channel: {}", vo);
+        Channel channel = new Channel();
+        create(vo, channel);
+
+        log.info("create channel success");
+        return CHANNEL + CREATE_SUCCESS;
+    }
+
+    @Override
+    public Page<Channel> page(ChannelQueryVo vo, Pageable pageable) {
+        return channelRepository.findByQuery(vo.getAcquirerCode(), vo.getSvc(), pageable);
+    }
+
+    @Override
+    public Channel getById(String id) {
+        return channelRepository.findById(id)
+                .orElseThrow(() -> new CustomException(CHANNEL + NOT_FOUND, HttpStatus.NOT_FOUND));
+    }
+
+    @Override
+    public String update(String id, ChannelVo vo) {
+        log.info("update channel: {}", vo);
+        Channel channel = getById(id);
+        create(vo, channel);
+
+        log.info("update channel success");
+        return CHANNEL + UPDATE_SUCCESS;
+    }
+
+    @Override
+    public String delete(String id) {
+        log.info("delete channel: {}", id);
+        Channel channel = getById(id);
+        channelRepository.delete(channel);
+
+        log.info("delete channel success");
+        return CHANNEL + DELETE_SUCCESS;
+    }
+
+    private void create(ChannelVo vo, Channel channel) {
+        channel.setAcquirerCode(vo.getAcquirerCode());
+        channel.setSvc(vo.getSvc());
+        channel.setParams(vo.getParams());
+
+
+        List<Client> clients = clientRepository.findAllById(vo.getClientIds());
+        channel.setClients(clients);
+
+        channelRepository.save(channel);
+    }
+}

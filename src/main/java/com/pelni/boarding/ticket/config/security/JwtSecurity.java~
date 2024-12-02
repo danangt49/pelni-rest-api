@@ -1,0 +1,5 @@
+package com.pelni.boarding.ticket.config.security;
+
+
+public class JwtSecurity {
+}

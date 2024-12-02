@@ -1,0 +1,26 @@
+server:
+  port: 7777
+
+spring:
+  application:
+    name: ticket
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/vmpidcco_checkin
+    username: root
+    password:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      dialect: org.hibernate.dialect.MySQLDialect
+
+app:
+  secret:
+    key: PelniKey
+  base-url: http://localhost:3000
+  rq-id: 061B2F96-762A-4540-9347-FA946A8B0490
+
+discord:
+  webhook:
+    url: https://discord.com/api/webhooks/1312277239282532394/dYALcrdaK1epG2Pl9XaoFpy0KZlIjpUebY_NxttTAH-RhRtiyclnTSYTSSqMf96TpezZ

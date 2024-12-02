@@ -1,0 +1,87 @@
+package com.pelni.boarding.ticket.config.security;
+
+import com.pelni.boarding.ticket.config.exception.CustomException;
+import com.pelni.boarding.ticket.entity.Admin;
+import com.pelni.boarding.ticket.repository.AdminRepository;
+import io.jsonwebtoken.Claims;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.Collections;
+import java.util.Optional;
+
+@Slf4j
+@RequiredArgsConstructor
+@SuppressWarnings("NullableProblems")
+public class JwtTokenFilter extends OncePerRequestFilter {
+
+    private final JwtToken jwtToken;
+    private final AdminRepository adminRepository;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+        try {
+            String authHeader = request.getHeader("Authorization");
+            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                String token = authHeader.substring(7);
+                if (jwtToken.validateToken(token)) {
+                    Claims claims = jwtToken.parseToken(token);
+                    setAuthenticationContext(claims);
+                }
+            }
+            filterChain.doFilter(request, response);
+        } catch (CustomException e) {
+            sendErrorResponse(response, e);
+        }
+    }
+
+    private void sendErrorResponse(HttpServletResponse response, CustomException e) throws IOException {
+        response.setStatus(e.getHttpStatus().value());
+        response.setContentType("application/json");
+        response.getWriter().write(
+                "{\"error\": \"" + e.getHttpStatus().getReasonPhrase() +
+                        "\", \"message\": \"" + e.getMessage() + "\"}"
+        );
+    }
+
+    private void setAuthenticationContext(Claims claims) {
+        String username = claims.get("username", String.class);
+
+        Optional<Admin> adminOptional = adminRepository.findByUsername(username);
+
+        if (adminOptional.isPresent()) {
+            Admin admin = adminOptional.get();
+
+            UserDetails userDetails = User.builder()
+                    .username(admin.getUsername())
+                    .password(admin.getPassword())
+                    .authorities(Collections.emptyList())
+                    .build();
+
+            Authentication authentication = new UsernamePasswordAuthenticationToken(
+                    userDetails,
+                    null,
+                    userDetails.getAuthorities()
+            );
+
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+        }
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return request.getRequestURI().contains("/api/v1/login");
+    }
+}

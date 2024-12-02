@@ -1,0 +1,73 @@
+package com.tsmid.auth.service.impl;
+
+import com.tsmid.auth.config.exception.CustomException;
+import com.tsmid.auth.entity.WhitelistUrl;
+import com.tsmid.auth.repository.WhitelistUrlRepository;
+import com.tsmid.auth.service.WhitelistUrlService;
+import com.tsmid.auth.vo.WhitelistUrlQueryVo;
+import com.tsmid.auth.vo.WhitelistUrlVo;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+
+import static com.tsmid.auth.util.MyConstants.*;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class WhitelistUrlServiceImpl implements WhitelistUrlService {
+    private final WhitelistUrlRepository whitelistUrlRepository;
+
+    @Override
+    public String create(WhitelistUrlVo vo) {
+        log.info("create whitelist url: {}", vo);
+        WhitelistUrl whitelistUrl = new WhitelistUrl();
+        create(vo, whitelistUrl);
+
+        log.info("create whitelist url success");
+        return WHITELIST_URL + CREATE_SUCCESS;
+    }
+
+    @Override
+    public Page<WhitelistUrl> page(WhitelistUrlQueryVo vo, Pageable pageable) {
+        return whitelistUrlRepository.findByQuery(vo.getUrl(), pageable);
+    }
+
+    @Override
+    public WhitelistUrl getById(Long id) {
+        return whitelistUrlRepository.findById(id)
+                .orElseThrow(() -> new CustomException(WHITELIST_URL + NOT_FOUND , HttpStatus.NOT_FOUND));
+    }
+
+    @Override
+    public String update(Long id, WhitelistUrlVo vo) {
+        log.info("update whitelist url: {}", id);
+        WhitelistUrl whitelistUrl = getById(id);
+        create(vo, whitelistUrl);
+
+        log.info("update whitelist url success");
+        return WHITELIST_URL + UPDATE_SUCCESS;
+    }
+
+    @Override
+    public String delete(Long id) {
+        log.info("delete whitelist url: {}", id);
+        WhitelistUrl whitelistUrl = getById(id);
+
+        whitelistUrlRepository.delete(whitelistUrl);
+
+        log.info("delete whitelist url success");
+        return WHITELIST_URL + DELETE_SUCCESS;
+    }
+
+    private void create(WhitelistUrlVo vo, WhitelistUrl whitelistUrl) {
+        whitelistUrl.setUrl(vo.getUrl());
+        whitelistUrl.setRequestBearerAccessToken(vo.getRequestBearerAccessToken());
+        whitelistUrl.setRequestSignature(vo.getRequestSignature());
+
+        whitelistUrlRepository.save(whitelistUrl);
+    }
+}
