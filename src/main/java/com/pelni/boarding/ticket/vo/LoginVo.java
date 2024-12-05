@@ -1,7 +1,6 @@
 package com.pelni.boarding.ticket.vo;
 
 import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -10,11 +9,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 public class LoginVo {
-    @NotNull
-    @NotEmpty
+    @NotEmpty(message = "username must not be empty")
     private String username;
 
-    @NotNull
-    @NotEmpty
+    @NotEmpty(message = "password must not be empty")
     private String password;
 }

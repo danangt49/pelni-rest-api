@@ -19,6 +19,8 @@ app:
   secret:
     key: PelniKey
   base-url: http://localhost:3000
+  username: loketjakarta@pelni.upg
+  password: Qwerty123$
   rq-id: 061B2F96-762A-4540-9347-FA946A8B0490
 
 discord:

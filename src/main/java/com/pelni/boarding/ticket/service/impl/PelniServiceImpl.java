@@ -45,6 +45,12 @@ public class PelniServiceImpl implements PelniService {
     @Value("${app.rq-id}")
     private String rqId;
 
+    @Value("${app.username}")
+    private String username;
+
+    @Value("${app.password}")
+    private String password;
+
     private final AdminRepository adminRepository;
     private final LogNewRepository logNewRepository;
     private final CheckinInfoRepository checkinInfoRepository;
@@ -61,7 +67,7 @@ public class PelniServiceImpl implements PelniService {
             throw new CustomException(INVALID_PASSWORD, HttpStatus.BAD_REQUEST);
         }
         String url = String.format("%s%s?rqid=%s&username=%s&password=%s",
-                baseUrl, PelniMethod.LOGIN.getUrl(), rqId, vo.getUsername(), vo.getPassword());
+                baseUrl, PelniMethod.LOGIN.getUrl(), rqId, username, password);
         log.info("Request Login URL: {} with method: {}", url, PelniMethod.LOGIN.getHttpMethod());
 
         ResponseEntity<String> responseEntity = restTemplate.exchange(
@@ -195,8 +201,8 @@ public class PelniServiceImpl implements PelniService {
                 checkinInfoDb.setBed(pax.get(5).asText());
                 checkinInfoDb.setGender(pax.get(6).asText());
                 checkinInfoDb.setTicketNumber(pax.get(7).asText());
-                checkinInfoDb.setMaxPrintTicket(Integer.valueOf(pax.get(8).asText()));
-                checkinInfoDb.setTicketPrinted(pax.get(9).asInt());
+                checkinInfoDb.setTicketPrinted(Integer.valueOf(pax.get(8).asText()));
+                checkinInfoDb.setMaxPrintTicket(pax.get(9).asInt());
                 checkinInfoDb.setPrice(pax.get(10).asText());
                 checkinInfoDb.setAdminFee(pax.get(11).asText());
                 checkinInfoDb.setNetPrice(pax.get(12).asText());
