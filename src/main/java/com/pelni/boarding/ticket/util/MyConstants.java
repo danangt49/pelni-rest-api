@@ -20,6 +20,7 @@ public class MyConstants {
     public static final String INVALID_USERNAME = "Invalid Username";
     public static final String GET_CHECKIN_INFO = "GET-CHECKIN-INFO (%s)";
     public static final String FLAGING_CHECKIN = "FLAGING-CHECKIN (%s) / (%s)";
-    public static final String LIMIT = "You have exceeded the ticket printing time limit.";
+    public static final String NOT_FOUND = "Kode Booking (%s) Tidak Ditemukan";
+    public static final String MAXIMUM_TIME = "Tidak dapat melakukan tindakan ini, Kode Booking (%s) telah mencapai batas waktu maksimum";
 
 }

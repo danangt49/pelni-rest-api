@@ -158,7 +158,13 @@ public class PelniServiceImpl implements PelniService {
         if (!"0".equals(jsonNode.path("error_code").asText())) {
             String errorMessage = jsonNode.path("error_message").asText();
             log.error("Check info failed: {}", errorMessage);
-            throw new CustomException(errorMessage, HttpStatus.INTERNAL_SERVER_ERROR);
+            if (jsonNode.path("error_code").asText().equals("500106")) {
+                throw new CustomException(String.format(NOT_FOUND, bookingCode) , HttpStatus.NOT_FOUND);
+            } else if (jsonNode.path("error_code").asText().equals("550004")) {
+                throw new CustomException(String.format(MAXIMUM_TIME, bookingCode) , HttpStatus.BAD_REQUEST);
+            } else {
+                throw new CustomException(errorMessage, HttpStatus.INTERNAL_SERVER_ERROR);
+            }
         }
 
         checkinInfoRepository.deleteAll(checkinInfoRepository.findByBookCode(bookingCode));
@@ -226,7 +232,7 @@ public class PelniServiceImpl implements PelniService {
 
         for (var ticket : vo.getTicketNumbers()) {
             var checkinInfo = checkinInfoRepository.findByTicketNumber(ticket)
-                    .orElseThrow(() -> new CustomException(LIMIT, HttpStatus.BAD_REQUEST));
+                    .orElseThrow(() -> new CustomException(MAXIMUM_TIME, HttpStatus.BAD_REQUEST));
 
             String url = String.format("%s%s?rqid=%s&user_id=%s&token=%s&ticket_no=%s",
                     baseUrl, PelniMethod.PRINT.getUrl(), rqId, Objects.requireNonNull(data).getAnotherData().getUserId(),
