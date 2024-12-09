@@ -232,7 +232,7 @@ public class PelniServiceImpl implements PelniService {
 
         for (var ticket : vo.getTicketNumbers()) {
             var checkinInfo = checkinInfoRepository.findByTicketNumber(ticket)
-                    .orElseThrow(() -> new CustomException(MAXIMUM_TIME, HttpStatus.BAD_REQUEST));
+                    .orElseThrow(() -> new CustomException(String.format(MAXIMUM_TIME, bookingCode), HttpStatus.BAD_REQUEST));
 
             String url = String.format("%s%s?rqid=%s&user_id=%s&token=%s&ticket_no=%s",
                     baseUrl, PelniMethod.PRINT.getUrl(), rqId, Objects.requireNonNull(data).getAnotherData().getUserId(),
